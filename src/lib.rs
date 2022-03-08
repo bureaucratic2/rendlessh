@@ -1,5 +1,5 @@
-use std::net::SocketAddr;
 use std::num::Wrapping;
+use std::{net::SocketAddr, path::PathBuf};
 
 use clap::Parser;
 
@@ -9,13 +9,79 @@ use tokio::{
     time::Instant,
 };
 
+const DEFAULT_PORT: u32 = 2222;
+const DEFAULT_DELAY: u64 = 10000;
+const DEFAULT_MAX_LEN: usize = 32;
 const PATTERN: &[u8; 4] = b"SSH-";
 
+pub struct Config {
+    pub port: u32,
+    pub delay: u64,
+    pub length: usize,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            port: DEFAULT_PORT,
+            delay: DEFAULT_DELAY,
+            length: DEFAULT_MAX_LEN,
+        }
+    }
+}
+
+/// Hello
 #[derive(Parser)]
 #[clap(author, version, about)]
 pub struct Cli {
-    #[clap(short)]
-    delay: u64,
+    /// Message millisecond delay [10000]
+    #[clap(short, long, value_name("NON-ZERO UINT"))]
+    delay: Option<u64>,
+
+    /// Sets a custom config file
+    #[clap(short, long, value_name("FILE"))]
+    config: Option<PathBuf>,
+
+    /// Maximum banner line length (3-255) [32]
+    #[clap(short, long, value_name("UINT"))]
+    length: Option<usize>,
+
+    /// Listening port [2222]
+    #[clap(short, long, value_name("UINT"))]
+    port: Option<u32>,
+}
+
+impl Cli {
+    pub fn parse_args() -> Config {
+        let cli = Cli::parse();
+        let mut config = Config::default();
+
+        if let Some(path) = cli.config.as_deref() {
+            // parse toml
+        }
+
+        if let Some(port) = cli.port {
+            config.port = port;
+        }
+
+        if let Some(delay) = cli.delay {
+            if delay == 0 {
+                // todo
+                panic!()
+            }
+            config.delay = delay;
+        }
+
+        if let Some(length) = cli.length {
+            if length < 3 || length > 255 {
+                // todo
+                panic!()
+            }
+            config.length = length;
+        }
+
+        config
+    }
 }
 
 pub struct Client {
