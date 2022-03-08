@@ -11,3 +11,6 @@ clap = {version = "3", features = ["derive"]}
 signal-hook = "0.3"
 toml = "0.5"
 failure = "0.1"
+log = "0.4"
+fern = "0.6"
+chrono = "0.4"

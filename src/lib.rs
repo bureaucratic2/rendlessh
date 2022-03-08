@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use std::fs::read_to_string;
 use std::num::Wrapping;
 use std::path::Path;
@@ -5,21 +6,23 @@ use std::{net::SocketAddr, path::PathBuf};
 
 use clap::Parser;
 
+use log::{debug, info};
 use tokio::{io::AsyncWriteExt, net::TcpStream, time::Instant};
 use toml::Value;
 
 use crate::error::Result;
+use crate::logger::setup_logging;
 
 const DEFAULT_PORT: u32 = 2222;
 const DEFAULT_DELAY: u64 = 10000;
 const DEFAULT_MAX_LEN: usize = 32;
 const PATTERN: &[u8; 4] = b"SSH-";
 
-#[derive(Clone, Copy)]
 pub struct Config {
     pub port: u32,
     pub delay: u64,
     pub length: usize,
+    path: PathBuf,
 }
 
 impl Default for Config {
@@ -28,7 +31,18 @@ impl Default for Config {
             port: DEFAULT_PORT,
             delay: DEFAULT_DELAY,
             length: DEFAULT_MAX_LEN,
+            path: PathBuf::default(),
         }
+    }
+}
+
+impl Display for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[Port {}] [Delay {}ms] [Max Length {}]",
+            self.port, self.delay, self.length
+        )
     }
 }
 
@@ -51,17 +65,26 @@ pub struct Cli {
     /// Listening port [2222]
     #[clap(short, long, value_name("UINT"))]
     port: Option<u32>,
+
+    /// Log level (repeatable)
+    #[clap(short, long, parse(from_occurrences))]
+    verbose: u64,
 }
 
 impl Cli {
     pub fn parse_args() -> Config {
         let cli = Cli::parse();
+
+        setup_logging(cli.verbose).expect("Fail to set global logger");
+
         let mut config = Config::default();
 
-        if let Some(path) = cli.config.as_deref() {
-            if parse_toml(path, &mut config).is_err() {
-                // todo log
+        if let Some(path) = cli.config {
+            match parse_toml(&path, &mut config) {
+                Ok(_) => info!("Load config from {:#?}, {}", path.as_os_str(), config),
+                Err(err) => info!("{}", err.to_string()),
             }
+            config.path = path;
         }
 
         if let Some(port) = cli.port {
@@ -81,6 +104,8 @@ impl Cli {
                 config.length = length;
             }
         }
+
+        info!("Current config {}", config);
 
         config
     }
@@ -111,6 +136,7 @@ impl Client {
         match self.stream.write_all(&line).await {
             Ok(_) => {
                 self.bytes_sent += line.len() as u64;
+                debug!("Sent {} bytes to {}", line.len(), self.addr);
                 Ok(())
             }
             Err(e) => Err(e.into()),
@@ -118,10 +144,10 @@ impl Client {
     }
 
     pub fn loginfo(&self) {
-        println!(
-            "connection from {} last {}ms, sent {} bytes",
+        info!(
+            "connection from {} last {}s, {} bytes sent",
             self.addr,
-            self.connect_time.elapsed().as_millis(),
+            self.connect_time.elapsed().as_millis() as f64 / 1000.0,
             self.bytes_sent
         );
     }
@@ -182,23 +208,5 @@ where
     Ok(())
 }
 
-#[cfg(test)]
-mod test {
-    use std::fs::read_to_string;
-    use toml::Value;
-    #[test]
-    fn parse_toml() {
-        let path = "/home/user1/projects/rendlessh/example.toml";
-        let content = read_to_string(path).unwrap();
-        let val = content.parse::<Value>().unwrap();
-
-        assert_eq!(val["Port"].as_integer(), Some(2222));
-        assert_eq!(val["Delay"].as_integer(), Some(10000));
-        if let Some(len) = val.get("MaxLineLength") {
-            assert_eq!(len.as_integer(), Some(32));
-        }
-        // assert_eq!(val["MaxLineLength"].as_integer(), Some(32));
-    }
-}
-
 mod error;
+mod logger;
