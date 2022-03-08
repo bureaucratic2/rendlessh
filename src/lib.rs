@@ -1,5 +1,8 @@
 use std::net::SocketAddr;
 use std::num::Wrapping;
+
+use clap::Parser;
+
 use tokio::{
     io::{AsyncWriteExt, Error},
     net::TcpStream,
@@ -7,6 +10,13 @@ use tokio::{
 };
 
 const PATTERN: &[u8; 4] = b"SSH-";
+
+#[derive(Parser)]
+#[clap(author, version, about)]
+pub struct Cli {
+    #[clap(short)]
+    delay: u64,
+}
 
 pub struct Client {
     addr: SocketAddr,

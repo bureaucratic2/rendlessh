@@ -1,5 +1,5 @@
-// use rendlessh::rand16;
-use rendlessh::Client;
+use clap::StructOpt;
+use rendlessh::{Cli, Client};
 
 use tokio::net::TcpListener;
 use tokio::time::{self, Instant};
@@ -22,6 +22,8 @@ async fn honeypot(mut client: Client) {
 
 #[tokio::main]
 async fn main() {
+    let _cli = Cli::parse();
+
     let listener = TcpListener::bind(format!("127.0.0.1:{}", DEFAULT_PORT))
         .await
         .unwrap();
