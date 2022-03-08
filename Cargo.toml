@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 tokio = {version = "1.17",features = ["full"]}
 clap = {version = "3", features = ["derive"]}
+signal-hook = "0.3"
+toml = "0.5"
+failure = "0.1"
