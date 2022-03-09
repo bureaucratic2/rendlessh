@@ -9,8 +9,10 @@ edition = "2021"
 tokio = {version = "1.17",features = ["full"]}
 clap = {version = "3", features = ["derive"]}
 signal-hook = "0.3"
+signal-hook-tokio = {version = "0.3", features = ["futures-v0_3"]}
 toml = "0.5"
 failure = "0.1"
 log = "0.4"
 fern = "0.6"
 chrono = "0.4"
+futures = "0.3"

@@ -10,19 +10,22 @@ use log::{debug, info};
 use tokio::{io::AsyncWriteExt, net::TcpStream, time::Instant};
 use toml::Value;
 
-use crate::error::Result;
+pub use crate::error::Result;
 use crate::logger::setup_logging;
 
 const DEFAULT_PORT: u32 = 2222;
 const DEFAULT_DELAY: u64 = 10000;
 const DEFAULT_MAX_LEN: usize = 32;
 const PATTERN: &[u8; 4] = b"SSH-";
+const BANNER: &str = "     ___  _____  _____  __   ______________ __\n    / _ \\/ __/ |/ / _ \\/ /  / __/ __/ __/ // /\n   / , _/ _//    / // / /__/ _/_\\ \\_\\ \\/ _  /\n  /_/|_/___/_/|_/____/____/___/___/___/_//_/";
 
 pub struct Config {
     pub port: u32,
     pub delay: u64,
     pub length: usize,
     path: PathBuf,
+
+    pub exit: bool,
 }
 
 impl Default for Config {
@@ -32,6 +35,8 @@ impl Default for Config {
             delay: DEFAULT_DELAY,
             length: DEFAULT_MAX_LEN,
             path: PathBuf::default(),
+
+            exit: false,
         }
     }
 }
@@ -46,9 +51,8 @@ impl Display for Config {
     }
 }
 
-/// Hello
 #[derive(Parser)]
-#[clap(author, version, about)]
+#[clap(author, version, about=BANNER)]
 pub struct Cli {
     /// Message millisecond delay [10000]
     #[clap(short, long, value_name("NON-ZERO UINT"))]
@@ -159,7 +163,7 @@ fn rand16(rng: &mut u128) -> u128 {
 }
 
 fn randline(max_len: usize, rng: &mut u128) -> Vec<u8> {
-    let len = 3 + rand16(rng) as usize % (max_len - 2);
+    let len = 4 + rand16(rng) as usize % (max_len - 2);
     let mut line = vec![0u8; len];
 
     for ch in line.iter_mut().take(len - 2) {
@@ -173,6 +177,8 @@ fn randline(max_len: usize, rng: &mut u128) -> Vec<u8> {
     if &line[0..4] == PATTERN {
         line[0] = b'X';
     }
+
+    debug!("{:?}", std::str::from_utf8(&line).unwrap());
 
     line
 }
@@ -210,3 +216,4 @@ where
 
 mod error;
 mod logger;
+mod statistics;
