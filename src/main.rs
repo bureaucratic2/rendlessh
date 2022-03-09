@@ -1,5 +1,5 @@
 use log::info;
-use rendlessh::{Cli, Client, Config, Result};
+use rendlessh::{background_statistic, Cli, Client, Config, Result, StatisticEvent};
 
 use tokio::net::TcpListener;
 use tokio::sync::{mpsc, oneshot, watch};
@@ -65,26 +65,32 @@ async fn main() -> Result<()> {
     // register signal handlers
     let signals = Signals::new(&[SIGTERM, SIGHUP, SIGUSR1])?;
     let handle = signals.handle();
-    let (tx, mut rx) = oneshot::channel();
-    let signals_task = tokio::spawn(handle_signals(signals, tx));
+    let (sig_tx, mut sig_rx) = oneshot::channel();
+    let signals_task = tokio::spawn(handle_signals(signals, sig_tx));
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port)).await?;
     // config channel, RW Lock
-    let (tx, _) = watch::channel(config);
+    let (cfg_tx, _) = watch::channel(config);
+
+    // statistics
+    let (stat_tx, stat_rx) = mpsc::channel(100);
+    tokio::spawn(background_statistic(stat_rx));
     loop {
         tokio::select! {
             res = listener.accept() => {
                 if let Ok((stream, addr)) = res {
-                    let c = Client::new(addr, Instant::now(), stream);
+                    let c = Client::new(addr, Instant::now(), stream, stat_tx.clone());
                     println!("accept from {}", addr);
-                    tokio::spawn(honeypot(c, tx.subscribe()));
+                    stat_tx.send(StatisticEvent::NewConn).await.unwrap();
+                    tokio::spawn(honeypot(c, cfg_tx.subscribe()));
                 }
             }
-            _ = &mut rx => {
+            _ = &mut sig_rx => {
                 break;
             }
         }
     }
+    drop(stat_tx);
 
     handle.close();
     let _ = signals_task.await;

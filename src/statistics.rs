@@ -1,9 +1,18 @@
+use log::info;
 use std::{
     fmt::{self, Display},
     time::Instant,
 };
+use tokio::sync::mpsc::Receiver;
 
-pub struct Statistics {
+#[derive(Debug)]
+pub enum StatisticEvent {
+    NewConn,
+    BytesSent(usize),
+    DropConn,
+}
+
+struct Statistics {
     start: Instant,
     pub current_connects: u64,
     pub total_connects: u64,
@@ -11,7 +20,7 @@ pub struct Statistics {
 }
 
 impl Statistics {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             start: Instant::now(),
             current_connects: 0,
@@ -32,4 +41,20 @@ impl Display for Statistics {
             self.total_bytes_sent
         )
     }
+}
+
+pub async fn background_statistic(mut stat_rx: Receiver<StatisticEvent>) {
+    let mut stat = Statistics::new();
+    while let Some(event) = stat_rx.recv().await {
+        match event {
+            StatisticEvent::NewConn => {
+                stat.current_connects += 1;
+                stat.total_connects += 1;
+            }
+            StatisticEvent::BytesSent(n) => stat.total_bytes_sent += n,
+            StatisticEvent::DropConn => stat.current_connects -= 1,
+        }
+    }
+    info!("gracefully exit, generate statistic information");
+    info!("{}", &stat);
 }
