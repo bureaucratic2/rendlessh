@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 use std::path::PathBuf;
 
-pub use crate::cli::Cli;
+pub use crate::cli::{reload_config, Cli};
 pub use crate::client::Client;
 pub use crate::error::Result;
 pub use crate::statistics::{background_statistic, StatisticEvent};
@@ -12,6 +12,7 @@ const DEFAULT_PORT: u32 = 2222;
 const DEFAULT_DELAY: u64 = 10000;
 const DEFAULT_MAX_LEN: usize = 32;
 
+#[derive(Debug, Clone)]
 pub struct Config {
     pub port: u32,
     pub delay: u64,

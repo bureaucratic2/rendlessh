@@ -105,3 +105,11 @@ where
 
     Ok(())
 }
+
+pub fn reload_config(cfg: &mut Config) {
+    let path = cfg.path.clone();
+    match parse_toml(&path, cfg) {
+        Ok(_) => info!("Reload config from {:#?}, {}", path.as_os_str(), cfg),
+        Err(err) => info!("{}", err.to_string()),
+    }
+}

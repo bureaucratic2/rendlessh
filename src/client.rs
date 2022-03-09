@@ -16,7 +16,7 @@ pub struct Client {
     rng: u128,
     stream: TcpStream,
 
-    pub tx: mpsc::Sender<StatisticEvent>,
+    pub tx: mpsc::UnboundedSender<StatisticEvent>,
 }
 
 impl Client {
@@ -24,7 +24,7 @@ impl Client {
         addr: SocketAddr,
         connect_time: Instant,
         stream: TcpStream,
-        tx: mpsc::Sender<StatisticEvent>,
+        tx: mpsc::UnboundedSender<StatisticEvent>,
     ) -> Self {
         Self {
             addr,
@@ -42,29 +42,25 @@ impl Client {
         match self.stream.write_all(&line).await {
             Ok(_) => {
                 self.bytes_sent += line.len() as u64;
-                self.tx
-                    .send(StatisticEvent::BytesSent(line.len()))
-                    .await
-                    .unwrap();
+                self.tx.send(StatisticEvent::BytesSent(line.len())).unwrap();
                 debug!("{} bytes sent to {}", line.len(), self.addr);
                 Ok(())
             }
             Err(e) => Err(e.into()),
         }
     }
+}
 
-    pub fn loginfo(&self) {
+impl Drop for Client {
+    fn drop(&mut self) {
         info!(
-            "connection from {} last {}s, {} bytes sent",
+            "Close connection from {} last {}s, {} bytes sent",
             self.addr,
             self.connect_time.elapsed().as_millis() as f64 / 1000.0,
             self.bytes_sent
         );
+        let _ = self.tx.send(StatisticEvent::DropConn);
     }
-}
-
-impl Drop for Client {
-    fn drop(&mut self) {}
 }
 
 fn rand16(rng: &mut u128) -> u128 {

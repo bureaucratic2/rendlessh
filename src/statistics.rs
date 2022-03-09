@@ -3,13 +3,14 @@ use std::{
     fmt::{self, Display},
     time::Instant,
 };
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::UnboundedReceiver;
 
 #[derive(Debug)]
 pub enum StatisticEvent {
     NewConn,
     BytesSent(usize),
     DropConn,
+    Log,
 }
 
 struct Statistics {
@@ -43,7 +44,7 @@ impl Display for Statistics {
     }
 }
 
-pub async fn background_statistic(mut stat_rx: Receiver<StatisticEvent>) {
+pub async fn background_statistic(mut stat_rx: UnboundedReceiver<StatisticEvent>) {
     let mut stat = Statistics::new();
     while let Some(event) = stat_rx.recv().await {
         match event {
@@ -53,6 +54,7 @@ pub async fn background_statistic(mut stat_rx: Receiver<StatisticEvent>) {
             }
             StatisticEvent::BytesSent(n) => stat.total_bytes_sent += n,
             StatisticEvent::DropConn => stat.current_connects -= 1,
+            StatisticEvent::Log => info!("{}", &stat),
         }
     }
     info!("gracefully exit, generate statistic information");
