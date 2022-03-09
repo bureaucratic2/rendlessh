@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
     let (sig_tx, mut sig_rx) = mpsc::unbounded_channel();
     let signals_task = tokio::spawn(handle_signals(signals, sig_tx));
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port)).await?;
+    let mut listener = TcpListener::bind(format!("127.0.0.1:{}", config.port)).await?;
     // config channel, RW Lock
     let (cfg_tx, _) = watch::channel(config.clone());
 
@@ -100,7 +100,14 @@ async fn main() -> Result<()> {
             Some(sig) = sig_rx.recv() => {
                 match sig {
                     Sig::Exit => break,
-                    Sig::Reload => reload_config(&mut config),
+                    Sig::Reload => {
+                        let port = config.port;
+                        reload_config(&mut config);
+                        if port != config.port {
+                            listener = TcpListener::bind(format!("127.0.0.1:{}", config.port)).await?;
+                        }
+                        cfg_tx.send(config.clone()).unwrap();
+                    },
                     Sig::Log => stat_tx.send(StatisticEvent::Log).unwrap(),
                 }
             }
@@ -110,7 +117,9 @@ async fn main() -> Result<()> {
 
     // inform all clients to close
     config.exit = true;
-    cfg_tx.send(config).unwrap();
+    // if rendlessh start and immediately receive SIGTERM, no cfg_rx exist
+    // and this send will fail, just ignore it instead of calling `unwrap()`
+    let _ = cfg_tx.send(config);
 
     handle.close();
     let _ = signals_task.await;

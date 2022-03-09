@@ -1,2 +1,5 @@
 /target
 *.log
+*.sh
+# for test
+example.toml
